@@ -1,14 +1,16 @@
 import 'package:expense_tracker/providers/budget_provider.dart';
 import 'package:expense_tracker/providers/category_provider.dart';
 import 'package:expense_tracker/providers/expense_provider.dart';
+import 'package:expense_tracker/providers/notification_provider.dart';
 import 'package:expense_tracker/providers/theme_provider.dart';
 import 'package:expense_tracker/screens/main_screen.dart';
+import 'package:expense_tracker/utils/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
+  await NotificationService.init();
   final themeProvider = ThemeProvider();
   await themeProvider.loadTheme();
 
@@ -23,6 +25,7 @@ void main() async {
         ),
         ChangeNotifierProvider(create: (_) => BudgetProvider()..loadBudget()),
         ChangeNotifierProvider(create: (_) => themeProvider),
+        ChangeNotifierProvider(create: (_) => NotificationProvider()),
       ],
       child: const ExpenseTrackerApp(),
     ),

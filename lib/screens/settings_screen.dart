@@ -1,6 +1,8 @@
 import 'package:expense_tracker/providers/expense_provider.dart';
+import 'package:expense_tracker/providers/notification_provider.dart';
 import 'package:expense_tracker/providers/theme_provider.dart';
 import 'package:expense_tracker/utils/export_utils.dart';
+import 'package:expense_tracker/utils/notification_service.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -14,7 +16,7 @@ class SettingsScreen extends StatelessWidget {
       context,
       listen: false,
     );
-
+    final notificationProvider = Provider.of<NotificationProvider>(context);
     return Scaffold(
       appBar: AppBar(title: const Text('Settings'), centerTitle: true),
       body: ListView(
@@ -33,6 +35,29 @@ class SettingsScreen extends StatelessWidget {
               onChanged: (value) => themeProvider.toggleTheme(value),
               activeColor: Colors.indigo,
             ),
+          ),
+          const Divider(height: 40),
+          const Text(
+            'Notifications',
+            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+          ListTile(
+            leading: const Icon(
+              Icons.notifications_active_outlined,
+              color: Colors.indigo,
+            ),
+            title: const Text('Daily Reminder'),
+            subtitle: const Text('Reminds you to log daily expenses'),
+            trailing: Switch(
+              value: notificationProvider.isEnabled,
+              onChanged: (value) => notificationProvider.toggleReminder(value),
+              activeColor: Colors.indigo,
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.alarm, color: Colors.grey),
+            title: const Text('Test Notification'),
+            onTap: () => NotificationService.showInstantNotification(),
           ),
 
           const Divider(height: 40),
