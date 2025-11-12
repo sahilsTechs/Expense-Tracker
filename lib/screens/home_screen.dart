@@ -18,23 +18,48 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   String _filter = 'All';
+  DateTimeRange? _selectedRange;
+  String _searchQuery = '';
 
   @override
   Widget build(BuildContext context) {
     final expenseProvider = Provider.of<ExpenseProvider>(context);
     final categoryProvider = Provider.of<CategoryProvider>(context);
-    final expenses = expenseProvider.expenses;
-    final filtered = _filter == 'All'
-        ? expenses
-        : expenses.where((e) => e.category == _filter).toList();
-
-    final currencyFormatter = NumberFormat.simpleCurrency();
     final budgetProvider = Provider.of<BudgetProvider>(context, listen: true);
+    final currencyFormatter = NumberFormat.simpleCurrency();
 
-    final totalSpent = expenseProvider.totalAmount;
+    // Filtered expenses (category + date + search)
+    List filtered = _filter == 'All'
+        ? expenseProvider.expenses
+        : expenseProvider.expenses.where((e) => e.category == _filter).toList();
+
+    // Apply date range
+    if (_selectedRange != null) {
+      filtered = filtered.where((e) {
+        return e.date.isAfter(
+              _selectedRange!.start.subtract(const Duration(days: 1)),
+            ) &&
+            e.date.isBefore(_selectedRange!.end.add(const Duration(days: 1)));
+      }).toList();
+    }
+
+    // Apply search filter
+    if (_searchQuery.isNotEmpty) {
+      filtered = filtered.where((e) {
+        final q = _searchQuery.toLowerCase();
+        return e.title.toLowerCase().contains(q) ||
+            e.note.toLowerCase().contains(q) ||
+            e.category.toLowerCase().contains(q);
+      }).toList();
+    }
+
+    final totalSpent = filtered.fold<double>(0, (sum, e) => sum + e.amount);
     final budget = budgetProvider.budgetLimit;
     final remaining = (budget - totalSpent).clamp(0, double.infinity);
-    final progress = (budget == 0) ? 0 : (totalSpent / budget).clamp(0, 1);
+    final double progress = (budget == 0)
+        ? 0
+        : (totalSpent / budget).clamp(0, 1);
+
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -46,6 +71,25 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
         actions: [
           IconButton(
+            icon: const Icon(Icons.date_range_outlined),
+            tooltip: 'Filter by Date Range',
+            onPressed: () async {
+              final now = DateTime.now();
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(now.year - 2),
+                lastDate: DateTime(now.year + 1),
+                initialDateRange:
+                    _selectedRange ??
+                    DateTimeRange(
+                      start: DateTime(now.year, now.month, 1),
+                      end: now,
+                    ),
+              );
+              if (picked != null) setState(() => _selectedRange = picked);
+            },
+          ),
+          IconButton(
             icon: const Icon(Icons.category_outlined),
             tooltip: 'Manage Categories',
             onPressed: () async {
@@ -55,7 +99,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   builder: (_) => const ManageCategoriesScreen(),
                 ),
               );
-              setState(() {}); // refresh categories on return
+              setState(() {});
             },
           ),
           IconButton(
@@ -66,14 +110,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 context,
                 MaterialPageRoute(builder: (_) => const SetBudgetScreen()),
               );
-              setState(() {}); // ✅ rebuild after coming back
+              setState(() {});
             },
           ),
         ],
       ),
       body: Column(
         children: [
-          // 💰 Summary Card
+          // 💰 Total Spent Card
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(20),
@@ -100,7 +144,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
                 Text(
-                  currencyFormatter.format(expenseProvider.totalAmount),
+                  currencyFormatter.format(totalSpent),
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 22,
@@ -110,97 +154,146 @@ class _HomeScreenState extends State<HomeScreen> {
               ],
             ),
           ),
-          Consumer<BudgetProvider>(
-            builder: (context, budgetProvider, _) {
-              final expenseProvider = Provider.of<ExpenseProvider>(
-                context,
-                listen: false,
-              );
-              final totalSpent = expenseProvider.totalAmount;
-              final budget = budgetProvider.budgetLimit;
-              final remaining = (budget - totalSpent).clamp(0, double.infinity);
-              final double progress = (budget == 0)
-                  ? 0.0
-                  : (totalSpent / budget).clamp(0.0, 1.0);
 
-              return Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  color: Colors.indigo,
-                  borderRadius: BorderRadius.circular(20),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.indigo.withOpacity(0.25),
-                      blurRadius: 10,
-                      offset: const Offset(0, 6),
-                    ),
-                  ],
+          // 💸 Budget Card
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16),
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.indigo,
+              borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.indigo.withOpacity(0.25),
+                  blurRadius: 10,
+                  offset: const Offset(0, 6),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+              ],
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Text(
-                          "This Month's Budget",
-                          style: TextStyle(color: Colors.white70, fontSize: 16),
-                        ),
-                        IconButton(
-                          onPressed: () async {
-                            await Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const SetBudgetScreen(),
-                              ),
-                            );
-                          },
-                          icon: const Icon(Icons.edit, color: Colors.white70),
-                        ),
-                      ],
+                    const Text(
+                      "This Month's Budget",
+                      style: TextStyle(color: Colors.white70, fontSize: 16),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      budget == 0
-                          ? 'No budget set'
-                          : '₹${budget.toStringAsFixed(2)}',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 12),
-                    LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 10,
-                      backgroundColor: Colors.white24,
-                      color: progress >= 1
-                          ? Colors.redAccent
-                          : progress >= 0.75
-                          ? Colors.orangeAccent
-                          : Colors.greenAccent,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      budget == 0
-                          ? 'Set a budget to track progress'
-                          : progress >= 1
-                          ? '⚠️ You have exceeded your budget!'
-                          : 'Remaining: ₹${remaining.toStringAsFixed(2)}',
-                      style: TextStyle(
-                        color: progress >= 1
-                            ? Colors.redAccent
-                            : Colors.white.withOpacity(0.9),
-                        fontSize: 14,
-                      ),
+                    IconButton(
+                      onPressed: () async {
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const SetBudgetScreen(),
+                          ),
+                        );
+                        setState(() {});
+                      },
+                      icon: const Icon(Icons.edit, color: Colors.white70),
                     ),
                   ],
                 ),
-              );
-            },
+                const SizedBox(height: 4),
+                Text(
+                  budget == 0
+                      ? 'No budget set'
+                      : '₹${budget.toStringAsFixed(2)}',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                LinearProgressIndicator(
+                  value: progress,
+                  minHeight: 10,
+                  backgroundColor: Colors.white24,
+                  color: progress >= 1
+                      ? Colors.redAccent
+                      : progress >= 0.75
+                      ? Colors.orangeAccent
+                      : Colors.greenAccent,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  budget == 0
+                      ? 'Set a budget to track progress'
+                      : progress >= 1
+                      ? '⚠️ You have exceeded your budget!'
+                      : 'Remaining: ₹${remaining.toStringAsFixed(2)}',
+                  style: TextStyle(
+                    color: progress >= 1
+                        ? Colors.redAccent
+                        : Colors.white.withOpacity(0.9),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // 📆 Date Range Display
+          if (_selectedRange != null)
+            Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 16.0,
+                vertical: 8,
+              ),
+              child: Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: Colors.indigo.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${DateFormat('MMM dd, yyyy').format(_selectedRange!.start)}  →  ${DateFormat('MMM dd, yyyy').format(_selectedRange!.end)}',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    GestureDetector(
+                      onTap: () => setState(() => _selectedRange = null),
+                      child: const Icon(Icons.close, size: 20),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          // 🔍 Search Bar
+          Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16.0,
+              vertical: 6.0,
+            ),
+            child: TextField(
+              onChanged: (value) => setState(() => _searchQuery = value),
+              decoration: InputDecoration(
+                hintText: 'Search by title, note or category...',
+                prefixIcon: const Icon(Icons.search),
+                filled: true,
+                fillColor: Colors.white,
+                contentPadding: const EdgeInsets.symmetric(
+                  vertical: 0,
+                  horizontal: 16,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide(color: Colors.grey[300]!),
+                ),
+              ),
+            ),
           ),
 
           // 🏷 Category Chips
@@ -209,7 +302,7 @@ class _HomeScreenState extends State<HomeScreen> {
             child: _buildCategoryChips(categoryProvider),
           ),
 
-          // 📜 Expense List or Empty State
+          // 📜 Expense List
           Expanded(
             child: filtered.isEmpty
                 ? _emptyState()
@@ -244,7 +337,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  // 💡 Redesigned Category Chips Section
+  // 🏷 Category Chips
   Widget _buildCategoryChips(CategoryProvider categoryProvider) {
     final categoryList = categoryProvider.categories
         .map((e) => e.name)
@@ -268,13 +361,11 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, i) {
           final c = cats[i];
           final selected = c == _filter;
-
           return AnimatedContainer(
             duration: const Duration(milliseconds: 250),
             curve: Curves.easeOut,
             child: ChoiceChip(
               elevation: selected ? 4 : 0,
-              pressElevation: 4,
               label: Text(
                 c,
                 style: TextStyle(
@@ -307,12 +398,12 @@ class _HomeScreenState extends State<HomeScreen> {
             const Icon(Icons.wallet_rounded, size: 80, color: Colors.grey),
             const SizedBox(height: 20),
             const Text(
-              'No expenses yet',
+              'No expenses found',
               style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Start tracking your spending by adding an expense.',
+              'Try searching or changing filters.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54),
             ),
