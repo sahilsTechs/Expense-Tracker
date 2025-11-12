@@ -20,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String _filter = 'All';
   DateTimeRange? _selectedRange;
   String _searchQuery = '';
+  String _sortOption = 'Newest First'; // default sort
 
   @override
   Widget build(BuildContext context) {
@@ -29,11 +30,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final currencyFormatter = NumberFormat.simpleCurrency();
 
     // Filtered expenses (category + date + search)
-    List filtered = _filter == 'All'
-        ? expenseProvider.expenses
-        : expenseProvider.expenses.where((e) => e.category == _filter).toList();
+    List filtered = List.from(
+      _filter == 'All'
+          ? expenseProvider.expenses
+          : expenseProvider.expenses.where((e) => e.category == _filter),
+    );
 
-    // Apply date range
+    // Apply date range filter
     if (_selectedRange != null) {
       filtered = filtered.where((e) {
         return e.date.isAfter(
@@ -51,6 +54,22 @@ class _HomeScreenState extends State<HomeScreen> {
             e.note.toLowerCase().contains(q) ||
             e.category.toLowerCase().contains(q);
       }).toList();
+    }
+
+    // ✅ Apply sorting
+    switch (_sortOption) {
+      case 'Newest First':
+        filtered.sort((a, b) => b.date.compareTo(a.date));
+        break;
+      case 'Oldest First':
+        filtered.sort((a, b) => a.date.compareTo(b.date));
+        break;
+      case 'Amount: High → Low':
+        filtered.sort((a, b) => b.amount.compareTo(a.amount));
+        break;
+      case 'Amount: Low → High':
+        filtered.sort((a, b) => a.amount.compareTo(b.amount));
+        break;
     }
 
     final totalSpent = filtered.fold<double>(0, (sum, e) => sum + e.amount);
@@ -117,7 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       body: Column(
         children: [
-          // 💰 Total Spent Card
+          // 💰 Budget Summary
           Container(
             margin: const EdgeInsets.all(16),
             padding: const EdgeInsets.all(20),
@@ -132,83 +151,33 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  'Total Spent',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                Text(
-                  currencyFormatter.format(totalSpent),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ),
-          ),
-
-          // 💸 Budget Card
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.indigo,
-              borderRadius: BorderRadius.circular(20),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.indigo.withOpacity(0.25),
-                  blurRadius: 10,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     const Text(
-                      "This Month's Budget",
-                      style: TextStyle(color: Colors.white70, fontSize: 16),
+                      'Total Spent',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
                     ),
-                    IconButton(
-                      onPressed: () async {
-                        await Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const SetBudgetScreen(),
-                          ),
-                        );
-                        setState(() {});
-                      },
-                      icon: const Icon(Icons.edit, color: Colors.white70),
+                    Text(
+                      currencyFormatter.format(totalSpent),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  budget == 0
-                      ? 'No budget set'
-                      : '₹${budget.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 22,
-                    fontWeight: FontWeight.bold,
-                  ),
                 ),
                 const SizedBox(height: 12),
                 LinearProgressIndicator(
                   value: progress,
-                  minHeight: 10,
+                  minHeight: 8,
                   backgroundColor: Colors.white24,
                   color: progress >= 1
                       ? Colors.redAccent
@@ -225,9 +194,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       ? '⚠️ You have exceeded your budget!'
                       : 'Remaining: ₹${remaining.toStringAsFixed(2)}',
                   style: TextStyle(
-                    color: progress >= 1
-                        ? Colors.redAccent
-                        : Colors.white.withOpacity(0.9),
+                    color: Colors.white.withOpacity(0.9),
                     fontSize: 14,
                   ),
                 ),
@@ -235,12 +202,12 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           ),
 
-          // 📆 Date Range Display
+          // 📆 Show Selected Date Range
           if (_selectedRange != null)
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 16.0,
-                vertical: 8,
+                vertical: 6,
               ),
               child: Container(
                 padding: const EdgeInsets.symmetric(
@@ -255,7 +222,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      '${DateFormat('MMM dd, yyyy').format(_selectedRange!.start)}  →  ${DateFormat('MMM dd, yyyy').format(_selectedRange!.end)}',
+                      '${DateFormat('MMM dd, yyyy').format(_selectedRange!.start)} → ${DateFormat('MMM dd, yyyy').format(_selectedRange!.end)}',
                       style: const TextStyle(fontWeight: FontWeight.w500),
                     ),
                     GestureDetector(
@@ -267,32 +234,81 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-          // 🔍 Search Bar
+          // 🔍 Search + Sort Row
           Padding(
             padding: const EdgeInsets.symmetric(
               horizontal: 16.0,
               vertical: 6.0,
             ),
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: 'Search by title, note or category...',
-                prefixIcon: const Icon(Icons.search),
-                filled: true,
-                fillColor: Colors.white,
-                contentPadding: const EdgeInsets.symmetric(
-                  vertical: 0,
-                  horizontal: 16,
+            child: Row(
+              children: [
+                Expanded(
+                  flex: 3,
+                  child: TextField(
+                    onChanged: (value) => setState(() => _searchQuery = value),
+                    decoration: InputDecoration(
+                      hintText: 'Search...',
+                      prefixIcon: const Icon(Icons.search),
+                      filled: true,
+                      fillColor: Colors.white,
+                      contentPadding: const EdgeInsets.symmetric(
+                        vertical: 0,
+                        horizontal: 16,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      enabledBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                    ),
+                  ),
                 ),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
+                const SizedBox(width: 10),
+                Expanded(
+                  flex: 2,
+                  child: DropdownButtonFormField<String>(
+                    value: _sortOption,
+                    isExpanded: true,
+                    decoration: InputDecoration(
+                      contentPadding: const EdgeInsets.symmetric(
+                        horizontal: 12,
+                        vertical: 8,
+                      ),
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        borderSide: BorderSide(color: Colors.grey[300]!),
+                      ),
+                      filled: true,
+                      fillColor: Colors.white,
+                    ),
+                    icon: const Icon(Icons.sort, color: Colors.indigo),
+                    items: const [
+                      DropdownMenuItem(
+                        value: 'Newest First',
+                        child: Text('Newest'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Oldest First',
+                        child: Text('Oldest'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Amount: High → Low',
+                        child: Text('High → Low'),
+                      ),
+                      DropdownMenuItem(
+                        value: 'Amount: Low → High',
+                        child: Text('Low → High'),
+                      ),
+                    ],
+                    onChanged: (value) {
+                      setState(() => _sortOption = value!);
+                    },
+                  ),
                 ),
-                enabledBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(16),
-                  borderSide: BorderSide(color: Colors.grey[300]!),
-                ),
-              ),
+              ],
             ),
           ),
 
@@ -334,11 +350,9 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: const Icon(Icons.add),
         label: const Text('Add Expense'),
       ),
-      
     );
   }
 
-  // 🏷 Category Chips
   Widget _buildCategoryChips(CategoryProvider categoryProvider) {
     final categoryList = categoryProvider.categories
         .map((e) => e.name)
@@ -362,33 +376,24 @@ class _HomeScreenState extends State<HomeScreen> {
         itemBuilder: (context, i) {
           final c = cats[i];
           final selected = c == _filter;
-          return AnimatedContainer(
-            duration: const Duration(milliseconds: 250),
-            curve: Curves.easeOut,
-            child: ChoiceChip(
-              elevation: selected ? 4 : 0,
-              label: Text(
-                c,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: selected ? Colors.white : Colors.black87,
-                ),
+          return ChoiceChip(
+            label: Text(
+              c,
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+                color: selected ? Colors.white : Colors.black87,
               ),
-              selected: selected,
-              selectedColor: Colors.indigo,
-              backgroundColor: Colors.white,
-              side: BorderSide(
-                color: selected ? Colors.indigo : Colors.grey[300]!,
-              ),
-              onSelected: (_) => setState(() => _filter = c),
             ),
+            selected: selected,
+            selectedColor: Colors.indigo,
+            backgroundColor: Colors.white,
+            onSelected: (_) => setState(() => _filter = c),
           );
         },
       ),
     );
   }
 
-  // 🎭 Empty State
   Widget _emptyState() {
     return Center(
       child: Padding(
@@ -404,7 +409,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Try searching or changing filters.',
+              'Try changing filters or adding an expense.',
               textAlign: TextAlign.center,
               style: TextStyle(color: Colors.black54),
             ),
