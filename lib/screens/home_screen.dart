@@ -1,5 +1,7 @@
+import 'package:expense_tracker/providers/budget_provider.dart';
 import 'package:expense_tracker/providers/category_provider.dart';
 import 'package:expense_tracker/screens/manage_categories_screen.dart';
+import 'package:expense_tracker/screens/set_budget_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -27,7 +29,12 @@ class _HomeScreenState extends State<HomeScreen> {
         : expenses.where((e) => e.category == _filter).toList();
 
     final currencyFormatter = NumberFormat.simpleCurrency();
+    final budgetProvider = Provider.of<BudgetProvider>(context, listen: true);
 
+    final totalSpent = expenseProvider.totalAmount;
+    final budget = budgetProvider.budgetLimit;
+    final remaining = (budget - totalSpent).clamp(0, double.infinity);
+    final progress = (budget == 0) ? 0 : (totalSpent / budget).clamp(0, 1);
     return Scaffold(
       backgroundColor: Colors.grey[100],
       appBar: AppBar(
@@ -49,6 +56,17 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               );
               setState(() {}); // refresh categories on return
+            },
+          ),
+          IconButton(
+            icon: const Icon(Icons.settings_outlined),
+            tooltip: 'Set Budget',
+            onPressed: () async {
+              await Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SetBudgetScreen()),
+              );
+              setState(() {}); // ✅ rebuild after coming back
             },
           ),
         ],
@@ -91,6 +109,98 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ],
             ),
+          ),
+          Consumer<BudgetProvider>(
+            builder: (context, budgetProvider, _) {
+              final expenseProvider = Provider.of<ExpenseProvider>(
+                context,
+                listen: false,
+              );
+              final totalSpent = expenseProvider.totalAmount;
+              final budget = budgetProvider.budgetLimit;
+              final remaining = (budget - totalSpent).clamp(0, double.infinity);
+              final double progress = (budget == 0)
+                  ? 0.0
+                  : (totalSpent / budget).clamp(0.0, 1.0);
+
+              return Container(
+                margin: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.indigo,
+                  borderRadius: BorderRadius.circular(20),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.indigo.withOpacity(0.25),
+                      blurRadius: 10,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          "This Month's Budget",
+                          style: TextStyle(color: Colors.white70, fontSize: 16),
+                        ),
+                        IconButton(
+                          onPressed: () async {
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const SetBudgetScreen(),
+                              ),
+                            );
+                          },
+                          icon: const Icon(Icons.edit, color: Colors.white70),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      budget == 0
+                          ? 'No budget set'
+                          : '₹${budget.toStringAsFixed(2)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 10,
+                      backgroundColor: Colors.white24,
+                      color: progress >= 1
+                          ? Colors.redAccent
+                          : progress >= 0.75
+                          ? Colors.orangeAccent
+                          : Colors.greenAccent,
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      budget == 0
+                          ? 'Set a budget to track progress'
+                          : progress >= 1
+                          ? '⚠️ You have exceeded your budget!'
+                          : 'Remaining: ₹${remaining.toStringAsFixed(2)}',
+                      style: TextStyle(
+                        color: progress >= 1
+                            ? Colors.redAccent
+                            : Colors.white.withOpacity(0.9),
+                        fontSize: 14,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
 
           // 🏷 Category Chips

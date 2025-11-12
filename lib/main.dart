@@ -1,9 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'providers/budget_provider.dart';
 import 'providers/expense_provider.dart';
 import 'providers/category_provider.dart';
 import 'screens/home_screen.dart';
 import 'utils/app_theme.dart';
+import 'package:flutter/material.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,9 @@ class ExpenseApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => CategoryProvider()..loadCategories(),
         ),
+        ChangeNotifierProvider(
+          create: (_) => BudgetProvider()..loadBudget(),
+        ), // ✅ this line required
       ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
