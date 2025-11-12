@@ -1,3 +1,4 @@
+import 'package:expense_tracker/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 import 'providers/budget_provider.dart';
 import 'providers/expense_provider.dart';
@@ -31,8 +32,8 @@ class ExpenseApp extends StatelessWidget {
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Expense Tracker',
-        theme: AppTheme.lightTheme,
-        home: const HomeScreen(),
+        theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.indigo),
+        home: const MainScreen(),
       ),
     );
   }
