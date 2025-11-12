@@ -1,3 +1,4 @@
+import 'package:expense_tracker/providers/category_provider.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
@@ -82,6 +83,13 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
   @override
   Widget build(BuildContext context) {
     final isEdit = widget.expense != null;
+    final categoryProvider = Provider.of<CategoryProvider>(context);
+    final categoryNames = categoryProvider.categories
+        .map((e) => e.name)
+        .toList();
+    if (!categoryNames.contains(_category) && categoryNames.isNotEmpty) {
+      _category = categoryNames.first;
+    }
     return Scaffold(
       appBar: AppBar(title: Text(isEdit ? 'Edit Expense' : 'Add Expense')),
       body: Padding(
@@ -118,7 +126,7 @@ class _AddEditExpenseScreenState extends State<AddEditExpenseScreen> {
               const SizedBox(height: 12),
               DropdownButtonFormField<String>(
                 value: _category,
-                items: Constants.categories
+                items: categoryNames
                     .map((c) => DropdownMenuItem(value: c, child: Text(c)))
                     .toList(),
                 onChanged: (v) => setState(() => _category = v!),

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'providers/expense_provider.dart';
+import 'providers/category_provider.dart';
 import 'screens/home_screen.dart';
 import 'utils/app_theme.dart';
 
@@ -14,8 +15,15 @@ class ExpenseApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ExpenseProvider()..loadExpenses(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) => ExpenseProvider()..loadExpenses(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => CategoryProvider()..loadCategories(),
+        ),
+      ],
       child: MaterialApp(
         debugShowCheckedModeBanner: false,
         title: 'Expense Tracker',
